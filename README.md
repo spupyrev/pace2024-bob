@@ -19,6 +19,6 @@ This creates an executable named `pace_release` and can be run as follows:
 
 | Track      | Command |
 | -------------- | ------- |
-| exact      | `./pace_release -confidence=30 < path/to/input_file.gr` |
-| heuristic  | `./pace_release < path/to/input_file.gr` |
-| cutwidth   | `./pace_release < path/to/input_file.gr` |
+| heuristic (*default*)  | `./pace_release < path/to/input_file.gr` |
+| exact      | `./pace_release -confidence=30 -time-limit=600 < path/to/input_file.gr` |
+| cutwidth   | `./pace_release -time-limit=30 < path/to/input_file.gr` |
