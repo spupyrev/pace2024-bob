@@ -15,7 +15,7 @@ To build the executable, run the following commands at the root of the repositor
 ```
 make r -j
 ```
-This creates an executable is named `pace_release` and can be run as follows:
+This creates an executable named `pace_release` and can be run as follows:
 
 | Track      | Command |
 | -------------- | ------- |
