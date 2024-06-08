@@ -22,3 +22,6 @@ This creates an executable named `pace_release` and can be run as follows:
 | heuristic (*default*)  | `./pace_release < path/to/input_file.gr` |
 | exact      | `./pace_release -confidence=30 -time-limit=600 < path/to/input_file.gr` |
 | cutwidth   | `./pace_release -time-limit=30 < path/to/input_file.gr` |
+
+> [!IMPORTANT]
+> Release **pace-2024** contains statically built binaries for the three tracks: `pace_heuristic`, `pace_exact`, and `pace_cutwidth`
