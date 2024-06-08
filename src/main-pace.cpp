@@ -22,7 +22,7 @@ void prepareCMDOptions(CMDOptions& options) {
   options.SetUsageMessage("Usage: pace [options]");
 
   options.AddAllowedOption("-verbose", "0", "Output debug info");
-  options.AddAllowedOption("-graceful", "0", "Graceful exit");
+  options.AddAllowedOption("-graceful", "1", "Graceful exit");
   options.AddAllowedOption("-seed", "0", "Random seed");
   options.AddAllowedOption("-time-limit", "290", "Time limit in seconds; 0 means no limit");
   options.AddAllowedOption("-confidence", "0", "Minimum confidence to output a solution");
