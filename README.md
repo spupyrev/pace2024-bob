@@ -6,22 +6,27 @@ This repository contains the source code of a solver for the [PACE 2024](https:/
 Coming
 
 ## Requirements
-Your machine needs to have a C++ compiler with C++17 support (Clang is recommended but GCC works too). 
-We use GNU Make to build the executables.
+Your machine needs to have a C++ compiler with C++17 support. We use GNU Make to build the executables.
+
+The solver has been developed and thoroughly tested with LLVM ([release_17.0.4](https://releases.llvm.org/)). 
+Use the corresponding versions of clang/lld for reproducible results.
 
 ## Building & Running
 
-To build the executable, run the following commands at the root of the repository:
+To build the executable, run one of the following commands at the root of the repository:
 ```
-make r -j
+make heuristic -j
+make exact -j
+make cutwidth -j
 ```
-This creates an executable named `pace_release` and can be run as follows:
+This creates an executable named `pace_*` and can be run as follows:
 
 | Track      | Command |
 | -------------- | ------- |
-| heuristic (*default*)  | `./pace_release < path/to/input_file.gr` |
-| exact      | `./pace_release -confidence=30 -time-limit=600 < path/to/input_file.gr` |
-| cutwidth   | `./pace_release -time-limit=30 < path/to/input_file.gr` |
+| heuristic  | `./pace_heuristic < path/to/input_file.gr` |
+| exact      | `./pace_exact < path/to/input_file.gr` |
+| cutwidth   | `./pace_cutwidth < path/to/input_file.gr` |
+| dev (`make -j`)       | `./pace < path/to/input_file.gr` or `./pace -verbose=1 -help` for a list of supported options |
 
 > [!IMPORTANT]
-> Release **pace-2024** contains statically built binaries for the three tracks: `pace_heuristic`, `pace_exact`, and `pace_cutwidth`
+> Release **pace-2024** contains statically built binaries (for Linux) for the three tracks: `pace_heuristic`, `pace_exact`, and `pace_cutwidth`
