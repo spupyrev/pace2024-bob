@@ -74,7 +74,7 @@ bool BalancedPartitioning<T>::isInitializedLB(
   for (uint32_t I = 0; I < NumDocuments; I++) {
     const Document* Doc = DocumentBegin[I];
     if (CachedDocs.find(Doc->Index) == CachedDocs.end()) {
-      // LOG("not cached for doc idx = %d; |CachedDocs| = %d", Doc->Index, CachedDocs.size());
+      // LOG_IF(verbose, "not cached for doc idx = %d; |CachedDocs| = %d", Doc->Index, CachedDocs.size());
       return false;
     }
   }

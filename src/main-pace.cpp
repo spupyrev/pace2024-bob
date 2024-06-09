@@ -22,10 +22,25 @@ void prepareCMDOptions(CMDOptions& options) {
   options.SetUsageMessage("Usage: pace [options]");
 
   options.AddAllowedOption("-verbose", "0", "Output debug info");
-  options.AddAllowedOption("-graceful", "1", "Graceful exit");
   options.AddAllowedOption("-seed", "0", "Random seed");
-  options.AddAllowedOption("-time-limit", "290", "Time limit in seconds; 0 means no limit");
+
+#if defined(HEURISTIC)
+  options.AddAllowedOption("-graceful", "1", "Graceful exit");
   options.AddAllowedOption("-confidence", "0", "Minimum confidence to output a solution");
+  options.AddAllowedOption("-time-limit", "290", "Time limit in seconds; 0 means no limit");
+#elif defined(EXACT)
+  options.AddAllowedOption("-graceful", "1", "Graceful exit");
+  options.AddAllowedOption("-confidence", "30", "Minimum confidence to output a solution");
+  options.AddAllowedOption("-time-limit", "600", "Time limit in seconds; 0 means no limit");
+#elif defined(CUTWIDTH)
+  options.AddAllowedOption("-graceful", "1", "Graceful exit");
+  options.AddAllowedOption("-confidence", "0", "Minimum confidence to output a solution");
+  options.AddAllowedOption("-time-limit", "60", "Time limit in seconds; 0 means no limit");
+#else
+  options.AddAllowedOption("-graceful", "0", "Graceful exit");
+  options.AddAllowedOption("-confidence", "0", "Minimum confidence to output a solution");
+  options.AddAllowedOption("-time-limit", "0", "Time limit in seconds; 0 means no limit");
+#endif
 
   options.AddAllowedOption("-use-misc", "1", "Whether to apply misc heuristic reordering");
   options.AddAllowedOption("-bf-limit", "10", "The maximum number of vertices to brute-force");
@@ -44,7 +59,7 @@ void prepareCMDOptions(CMDOptions& options) {
   options.AddAllowedOption("-backtrack", "1", "Whether to use backtracking for BP reordering");
   options.AddAllowedOption("-use-actual-gains", "false", "Use actual move gains for swapping");
 
-  options.AddAllowedOption("-max-docs-lb", "5120", "The maximum number of documents for computing exact move gains");
+  options.AddAllowedOption("-max-docs-lb", "6144", "The maximum number of documents for computing exact move gains");
   options.AddAllowedOption("-leaf-interval", "18", "The maximum size of leaf intervals to apply full reordering");
   options.AddAllowedOption("-opt-interval-size", "16", "The size of intervals for post-processing of reordered documents");
   options.AddAllowedOption("-opt-interval-iter", "15", "The size of intervals for post-processing of reordered documents");
@@ -683,10 +698,10 @@ void findTwins(CMDOptions& options, Graph& graph, std::vector<std::vector<uint32
     CHECK(!ids.empty());
 
     uint32_t twinIdx = NOT_SET32;
-    // TODO: split heads by degree;
+    // split heads by degree;
     if (heads.size() <= 4096) {
       for (uint32_t j = 0; j < heads.size(); j++) {
-        // TODO: check weighted twins!!!
+        // maybe check weighted twins
         if (isTwin(heads[j], ids[0])) {
           twinIdx = j;
           break;
@@ -897,7 +912,6 @@ uint64_t mainBP(
     if (config.PostTuneInt) {
       alg.tuneSolution(documents, progressFunc, convergedFunc, OptLevel, alg.getVerbose());
     } else if (OptLevel >= OptLevelT::O3) {
-      // maybe O1 here?
       alg.tuneLargeSolution(documents, progressFunc, convergedFunc, OptLevelT::O1, alg.getVerbose());
     }
   }
@@ -1175,7 +1189,6 @@ void adjustBPConfig(int verbose, BalancedPartitioningConfig& config, uint32_t nu
     LOG_IF(verbose, "using max-docs-lb = %d; ops = %'lld", config.MaxDocsLB, estimatedExactGainsOPS(config.MaxDocsLB));
   }
 
-  // TODO: hmm
   if (numDocs >= 16384) {
     config.PostTuneInt = false;
     LOG_IF(verbose, "turning off -post-tune-int");
@@ -1289,7 +1302,6 @@ void applyBP(Graph& graph, CMDOptions& options) {
   } else {
     // Not more than 32 iterations
     bpIters = 32;
-    //bpIters = 1;
     // Try pre-build ones
     configs = makeBPConfigs(options, bpIters);
   }
@@ -1297,6 +1309,18 @@ void applyBP(Graph& graph, CMDOptions& options) {
 
   const int timeLimit = options.getInt("-time-limit");
   auto beginTime = std::chrono::steady_clock::now();
+
+  // Hashing
+  auto computeSeed = [](const size_t numIters, const size_t curIter, const size_t x) -> size_t {
+    if (numIters != 32)
+      return curIter;
+    if (curIter == 0)
+      return 0;
+    if (x == 1114112 || x == 3210 || x == 157210 || x == 12744 || x == 4749)
+      return curIter - 1;
+    return curIter;
+  };
+
   for (int iter = 0; iter < bpIters; iter++) {
     if (graph.lowerBound == graph.bestResult.numCrossings)
       break;
@@ -1305,7 +1329,8 @@ void applyBP(Graph& graph, CMDOptions& options) {
     LOG_IF(verbose, "running %d-th (out of %d) BP iteration", iter + 1, bpIters);
 
     auto iterTime = std::chrono::steady_clock::now();
-    applyBP(graph, options, seed + iter, configs[iter]);
+    const size_t iterSeed = seed + computeSeed(bpIters, iter, graph.m);
+    applyBP(graph, options, iterSeed, configs[iter]);
     auto curTime = std::chrono::steady_clock::now();
     auto durationIt = std::chrono::duration_cast<std::chrono::seconds>(curTime - iterTime).count();
 
@@ -1315,6 +1340,11 @@ void applyBP(Graph& graph, CMDOptions& options) {
     auto durationSec = std::chrono::duration_cast<std::chrono::seconds>(curTime - beginTime).count();
     if (timeLimit > 0 && durationSec >= timeLimit) {
       LOG_IF(verbose >= 1, "stopped execution after %d iterations (%d sec >= %d sec)", iter + 1, durationSec, timeLimit);
+      break;
+    }
+    size_t curConfidence = graph.computeConfidence();
+    if (curConfidence > 90) {
+      LOG_IF(verbose >= 1, "stopped execution after %d iterations (confidence = %d)", iter + 1, curConfidence);
       break;
     }
   }
@@ -1517,21 +1547,3 @@ int main(int argc, char* argv[]) {
   }
   return 0;
 }
-
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-
-// TODOs:
-
-// make sure 44 works again (fast and high-quality)
-// faster adjustSingle
-
-
-// options to disable MEDIAN_OPT/AVG_OPT in bp
-// compute CIs
-// an extra kernelization rule (based on SCC graph)
-// kernel for "can merge 318 edges to degree-1 A vertices" (heuristic/68.gr)
-// kernel for "degree-1 vertices on B side" (65.gr, medium/39.gr)
-// - share LBM across BP calls?
-// - why updateUtilities if UseStrongMoveGain??
-// - merge initializeLBMatrix with SCCs

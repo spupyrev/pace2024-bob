@@ -50,9 +50,9 @@ class CMDOptions {
       std::string s(argv[i]);
 
       if (verbose) {
-        if (s == "/?"  || s == "-?" || s == "--help" || s == "-help") {
+        if (s == "-help") {
           Usage(argv[0]);
-          throw 0;
+          exit(0);
         }
       }
 

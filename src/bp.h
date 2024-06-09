@@ -237,13 +237,13 @@ struct BalancedPartitioningConfig {
   uint32_t LeafInterval = 18;
 
   /// Maximum number of documents for lower bounds.
-  uint32_t MaxDocsLB = 5120;
+  uint32_t MaxDocsLB = 6144;
 
   /// Using up-to-date move gains for swapping.
   bool UseActualGains = false;
 
   /// The size of intervals for post-processing of reordered documents.
-  uint32_t PostIntervalSize = 18;
+  uint32_t PostIntervalSize = 16;
 
   /// The size of intervals for post-processing of reordered documents.
   uint32_t PostIntervalIter = 15;
@@ -476,6 +476,7 @@ public:
   /// Tune all intervals using a given optimization level.
   uint64_t tuneAllIntervals(
     std::vector<Document *>& Documents,
+    const std::vector<std::pair<uint32_t, uint32_t>>& Intervals,
     std::function<void(const std::string& name)> progressFunc,
     const OptLevelT OptLevel,
     const size_t verbose);
@@ -542,7 +543,6 @@ public:
     const std::vector<Document*>::iterator& DocumentBegin,
     const std::vector<Document*>::iterator& DocumentEnd,
     const uint32_t FirstIndex,
-    std::vector<uint32_t>& Order2,
     std::vector<uint64_t>& SumL,
     std::vector<uint64_t>& SumR) const;
 
@@ -650,7 +650,7 @@ struct UtilitySignature {
 
   /// Cached cost of moving a document from left to right bucket.
   double CachedCostLR = 0;
-  /// Hmm.
+  /// Aux values for weak gains.
   int64_t YRB = 0;
   int64_t YLB = 0;
   int64_t XRB = 0;

@@ -37,14 +37,15 @@ bool attemptsConverged(
 }
 
 std::vector<std::pair<uint32_t, uint32_t>>
-splitIntoIntervals(uint32_t NumDocuments, uint32_t MaxDocsLB) {
+splitIntoIntervals(uint32_t NumDocuments, uint32_t MaxDocsLB, uint32_t Ratio) {
   CHECK(MaxDocsLB > 0);
   if (NumDocuments <= MaxDocsLB) {
     return {{0, NumDocuments}};
   }
+  CHECK(Ratio > 1);
 
   std::vector<std::pair<uint32_t, uint32_t>> Res;
-  uint32_t Delta = std::max(uint32_t(1), MaxDocsLB / 2);
+  uint32_t Delta = std::max(uint32_t(1), MaxDocsLB / Ratio);
   //uint32_t Delta = std::max(uint32_t(1), MaxDocsLB / 4);
   for (uint32_t I = 0; I < NumDocuments; I += Delta) {
     uint32_t EI = std::min(NumDocuments, I + MaxDocsLB);
@@ -72,7 +73,8 @@ void BalancedPartitioning<T>::tuneSolution(
   // For determinism
   RNG.seed(seed);
 
-  tuneAllIntervals(Documents, progressFunc, OptLevel, verbose);
+  std::vector<std::pair<uint32_t, uint32_t>> Intervals = splitIntoIntervals(Documents.size(), Config.MaxDocsLB, /* Ratio */ 2);
+  tuneAllIntervals(Documents, Intervals, progressFunc, OptLevel, verbose);
   if (convergedFunc()) return;
   if (OptLevel == OptLevelT::O0)
     return;
@@ -121,11 +123,15 @@ void BalancedPartitioning<T>::tuneLargeSolution(
   // For determinism
   RNG.seed(seed);
 
-  tuneAllIntervals(Documents, progressFunc, OptLevel, verbose);
+  std::vector<std::pair<uint32_t, uint32_t>> Intervals;
+
+  Intervals = splitIntoIntervals(Documents.size(), Config.MaxDocsLB, /* Ratio */ 3);
+  tuneAllIntervals(Documents, Intervals, progressFunc, OptLevel, verbose);
   if (convergedFunc()) return;
   progressFunc("bp_" + std::to_string(seed) + "_tunelarge");
 
-  tuneAllIntervals(Documents, progressFunc, OptLevel, verbose);
+  Intervals = splitIntoIntervals(Documents.size(), Config.MaxDocsLB, /* Ratio */ 2);
+  tuneAllIntervals(Documents, Intervals, progressFunc, OptLevel, verbose);
 }
 
 /// O0 == adjustSingle only
@@ -224,6 +230,7 @@ uint64_t BalancedPartitioning<T>::tuneInterval(
 template <class T>
 uint64_t BalancedPartitioning<T>::tuneAllIntervals(
     std::vector<Document *>& Documents,
+    const std::vector<std::pair<uint32_t, uint32_t>>& Intervals,
     std::function<void(const std::string& name)> progressFunc,
     const OptLevelT OptLevel,
     const size_t verbose) {
@@ -232,7 +239,6 @@ uint64_t BalancedPartitioning<T>::tuneAllIntervals(
   CHECK(Config.MaxDocsLB > 0);
   auto beginTime = steady_clock::now();
 
-  std::vector<std::pair<uint32_t, uint32_t>> Intervals = splitIntoIntervals(Documents.size(), Config.MaxDocsLB);
   LOG_IF(verbose, "tune up full BP solution; got %d interval(s)", Intervals.size());
 
   uint64_t SavedCrossings = 0;
@@ -315,7 +321,7 @@ uint64_t BalancedPartitioning<T>::randomSearch(
   // Stop if already optimal
   if (CurCrossings == OptCrossings)
     return SavedCrossings;
-  // // TODO: uncomment this?
+  // need this?
   // SavedCrossings = tuneInterval(DocumentBegin, DocumentEnd, false, OptLevelT::O2, 0);
   // const uint64_t PostIntervalSize = 11;
   // const uint64_t LowerBoundInt = computeLowerBound(DocumentBegin, DocumentEnd, PostIntervalSize);
@@ -460,7 +466,6 @@ uint64_t BalancedPartitioning<T>::randomSearchIncremental(
   LOG_IF(verbose, "random search for intervals of size = %d using %d attempts", IntervalSize, RandomAttempts);
   uint64_t SavedCrossings = 0;
 
-  // TODO: buildIntervals in a function
   // Build the intervals
   const uint32_t IntervalIters = 5;
   const uint32_t StepSize = std::max(IntervalSize / 4, uint32_t(15));
@@ -781,6 +786,7 @@ uint64_t BalancedPartitioning<T>::sortIntervalOpt(
     DPMasks.push_back({});
   }
   if (DPMasks[N - 1].empty()) {
+    LOG_IF(verbose >= 2, "Init DPMasks for N - 1 = %d", N - 1);
     DPMasks[N - 1].reserve(10000);
     for (MaskType Set = 1; Set < MAX_MASK; Set++) {
       const auto& Prevs = DPPrevs[Set];
@@ -915,10 +921,10 @@ uint64_t BalancedPartitioning<T>::sortIntervalOpt(
     const auto& Nexts = DPPrevs[Set2];
     const uint16_t NumNexts = Nexts.size();
 
-    for (uint16_t PrevIdx = 0; PrevIdx < NumPrevs; PrevIdx++) {
-      const uint16_t Prev = Prevs[PrevIdx];
-      for (uint16_t NextIdx = 0; NextIdx < NumNexts; NextIdx++) {
-        const uint16_t Next = Nexts[NextIdx];
+    for (uint16_t NextIdx = 0; NextIdx < NumNexts; NextIdx++) {
+      const uint16_t Next = Nexts[NextIdx];
+      for (uint16_t PrevIdx = 0; PrevIdx < NumPrevs; PrevIdx++) {
+        const uint16_t Prev = Prevs[PrevIdx];
         AllCrossings += LB_rev[Next][Prev];
       }
     }
@@ -1292,45 +1298,70 @@ uint64_t BalancedPartitioning<T>::adjustSingle(
     const std::vector<Document*>::iterator& DocumentBegin,
     const std::vector<Document*>::iterator& DocumentEnd,
     const uint32_t FirstIndex,
-    std::vector<uint32_t>& Order2,
     std::vector<uint64_t>& SumL,
     std::vector<uint64_t>& SumR) const {
   const uint32_t N = std::distance(DocumentBegin, DocumentEnd);
   CHECK(N > 1);
 
-  uint32_t N2 = 0;
-  for (uint32_t DocIdx = 0; DocIdx < N; DocIdx++) {
-    if (DocIdx != FirstIndex) {
-      Order2[N2++] = DocIdx;
+  const uint32_t FirstLI = DocumentBegin[FirstIndex]->LocalIndex;
+
+  // Check if already optimal
+  bool IsOptimal = true;
+  for (uint32_t I = 0; I < FirstIndex; I++) {
+    const uint32_t OtherLI = DocumentBegin[I]->LocalIndex;
+    if (LBData[OtherLI][FirstLI] > LBData[FirstLI][OtherLI]) {
+      IsOptimal = false;
+      break;
     }
   }
-
-  // SumL[I] = sum LB(J, Doc) for J <= I
-  // SumR[I] = sum LB(J, Doc) for J >= I
-  for (uint32_t I = 0, J = N2 - 1; I < N2; I++, J--) {
-    // I is the insertion index
-    SumL[I] = I > 0 ? SumL[I - 1] : 0;
-    SumL[I] += LBData[DocumentBegin[Order2[I]]->LocalIndex][DocumentBegin[FirstIndex]->LocalIndex];
-    //
-    SumR[J] = J + 1 < N2 ? SumR[J + 1] : 0;
-    SumR[J] += LBData[DocumentBegin[FirstIndex]->LocalIndex][DocumentBegin[Order2[J]]->LocalIndex];
+  if (IsOptimal) {
+    for (uint32_t I = FirstIndex + 1; I < N; I++) {
+      const uint32_t OtherLI = DocumentBegin[I]->LocalIndex;
+      if (LBData[FirstLI][OtherLI] > LBData[OtherLI][FirstLI]) {
+        IsOptimal = false;
+        break;
+      }
+    }
+  }
+  if (IsOptimal) {
+    return 0;
   }
 
-  uint64_t CurCrossings = NOT_SET64;
-  uint64_t BestCrossings = NOT_SET64;
+  // Apply the optimization
+  const uint32_t N2 = N - 1;
+
+  // SumL[I] = sum LB(J, Doc) for J <= I
+  SumL[0] = 0;
+  for (uint32_t I = 0; I < FirstIndex; I++) {
+    // I is the insertion index
+    SumL[I + 1] = SumL[I] + LBData[DocumentBegin[I]->LocalIndex][FirstLI];
+  }
+  for (uint32_t I = FirstIndex; I < N2; I++) {
+    SumL[I + 1] = SumL[I] + LBData[DocumentBegin[I + 1]->LocalIndex][FirstLI];
+  }
+
+  // SumR[I] = sum LB(J, Doc) for J >= I
+  SumR[N2] = 0;
+  for (uint32_t I = 0; I + FirstIndex < N2; I++) {
+    const uint32_t J = N2 - 1 - I;
+    SumR[J] = SumR[J + 1] + LBData[FirstLI][DocumentBegin[J + 1]->LocalIndex];
+  }
+  for (uint32_t I = N2 - FirstIndex; I < N2; I++) {
+    const uint32_t J = N2 - 1 - I;
+    SumR[J] = SumR[J + 1] + LBData[FirstLI][DocumentBegin[J]->LocalIndex];
+  }
+
+  const uint64_t CurCrossings = SumL[FirstIndex] + SumR[FirstIndex];
+  uint64_t BestCrossings = MAX_64;
   uint32_t BestPos = NOT_SET32;
-  for (uint32_t I = 0; I <= N2; I++) {
+  for (uint32_t I = 0; I < N; I++) {
     // insertion point is right before I-th in Order2
-    uint64_t CrossingsI = (I > 0 ? SumL[I - 1] : 0) + (I < N2 ? SumR[I] : 0);
-    if (BestCrossings == NOT_SET64 || BestCrossings > CrossingsI) {
+    const uint64_t CrossingsI = SumL[I] + SumR[I];
+    if (BestCrossings > CrossingsI) {
       BestCrossings = CrossingsI;
       BestPos = I;
     }
-    if (I == FirstIndex) {
-      CurCrossings = CrossingsI;
-    }
   }
-  CHECK(CurCrossings != NOT_SET64);
   CHECK(BestCrossings <= CurCrossings);
 
   // Stop early if no better solution is found
@@ -1338,17 +1369,30 @@ uint64_t BalancedPartitioning<T>::adjustSingle(
     return 0;
   CHECK(BestPos != FirstIndex);
 
-  // Insert at position BestPos
-  uint32_t CurBucket = DocumentBegin[0]->Bucket;
-  for (uint32_t I = 0; I < BestPos; I++) {
-    DocumentBegin[Order2[I]]->Bucket = CurBucket++;
+  // Insert the element at position BestPos
+  const uint32_t FirstBucket = DocumentBegin[FirstIndex]->Bucket;
+  const uint32_t BestBucket = DocumentBegin[BestPos]->Bucket;
+  if (FirstIndex + 1 == BestPos) {
+    std::swap(DocumentBegin[FirstIndex], DocumentBegin[FirstIndex + 1]);
+    DocumentBegin[FirstIndex]->Bucket = FirstBucket;
+    DocumentBegin[FirstIndex + 1]->Bucket = FirstBucket + 1;
+  } else if (BestPos + 1 == FirstIndex) {
+    CHECK(FirstBucket == BestBucket + 1);
+    std::swap(DocumentBegin[BestPos], DocumentBegin[BestPos + 1]);
+    DocumentBegin[BestPos]->Bucket = BestBucket;
+    DocumentBegin[BestPos + 1]->Bucket = BestBucket + 1;
+  } else if (FirstIndex < BestPos) {
+    std::rotate(DocumentBegin + FirstIndex, DocumentBegin + FirstIndex + 1, DocumentBegin + BestPos + 1);
+    for (uint32_t I = FirstIndex, J = 0; I <= BestPos; I++, J++) {
+      DocumentBegin[I]->Bucket = FirstBucket + J;
+    }
+  } else {
+    CHECK(FirstIndex > BestPos);
+    std::rotate(DocumentBegin + BestPos, DocumentBegin + FirstIndex, DocumentBegin + FirstIndex + 1);
+    for (uint32_t I = BestPos, J = 0; I <= FirstIndex; I++, J++) {
+      DocumentBegin[I]->Bucket = BestBucket + J;
+    }
   }
-  DocumentBegin[FirstIndex]->Bucket = CurBucket++;
-  for (uint32_t I = BestPos; I < N2; I++) {
-    DocumentBegin[Order2[I]]->Bucket = CurBucket++;
-  }
-
-  std::sort(DocumentBegin, DocumentEnd, Document::BucketOrder());
 
   LOG_IF(verbose >= 4, "  eliminated %d (%d -> %d) crossings by reordering single document",
       CurCrossings - BestCrossings, CurCrossings, BestCrossings);
@@ -1372,15 +1416,14 @@ uint64_t BalancedPartitioning<T>::adjustSingle(
   uint64_t NewCrossings = CurCrossings;
 
   // Pre-allocate data for the algorithm
-  std::vector<uint32_t> Order2(NumDocuments - 1);
-  std::vector<uint64_t> SumL(NumDocuments - 1);
-  std::vector<uint64_t> SumR(NumDocuments - 1);
+  std::vector<uint64_t> SumL(NumDocuments);
+  std::vector<uint64_t> SumR(NumDocuments);
 
   size_t NumUpdateIters = 0;
   while (true) {
     size_t NumUpdates = 0;
     for (uint32_t I = 0; I < NumDocuments; I++) {
-      uint64_t Delta = adjustSingle(DocumentBegin, DocumentEnd, I, Order2, SumL, SumR);
+      uint64_t Delta = adjustSingle(DocumentBegin, DocumentEnd, I, SumL, SumR);
       if (Delta > 0) {
         NewCrossings -= Delta;
         NumUpdates++;
@@ -1391,7 +1434,10 @@ uint64_t BalancedPartitioning<T>::adjustSingle(
       break;
     NumUpdateIters++;
 
-    if ((OptLevel == OptLevelT::O0) || (OptLevel == OptLevelT::O1 && Config.PostTuneInt == 0 && NumUpdateIters >= 2)) {
+    if (OptLevel <= OptLevelT::O1 && Config.PostTuneInt == 0 && NumUpdateIters >= 3) {
+      break;
+    }
+    if (OptLevel <= OptLevelT::O1 && Config.PostTuneInt == 1 && NumUpdateIters >= 9) {
       break;
     }
   }

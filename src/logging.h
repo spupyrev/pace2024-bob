@@ -34,7 +34,6 @@ const int CHECK_EXIT_CODE = 40;
 #endif
 
 #define GET_MACRO(_1,_2,_3,_4,_5,_6,_7,_8,NAME,...) NAME
-  // TODO
 #define CHECK(...) GET_MACRO(__VA_ARGS__, CHECK2, CHECK2, CHECK2, CHECK2, CHECK2, CHECK2, CHECK2, CHECK1)(__VA_ARGS__)
 
 #define ERROR(message) \

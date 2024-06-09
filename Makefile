@@ -4,6 +4,11 @@
 ##    "make r"  for a release version.
 ##    "make rs" for a statically linked release version.
 ##    "make d"  for a debug version (no optimizations).
+##
+##  Pace-specific versions (same as release with custom flags)
+##    "make heuristic"
+##    "make exact"
+##    "make cutwidth"
 
 EXEC      = pace
 DEPDIR    = src
@@ -15,60 +20,75 @@ EXEC      ?= $(notdir $(PWD))
 CSRCS      = $(wildcard $(PWD)/*.cpp)
 DSRCS      = $(foreach dir, $(DEPDIR), $(filter-out $(MROOT)/$(dir)/main*.cpp, $(wildcard $(MROOT)/$(dir)/*.cpp)))
 CHDRS      = $(wildcard $(PWD)/*.h)
-COBJS      = $(CSRCS:.cpp=.o) $(DSRCS:.cpp=.o)
 
+COBJS      = $(CSRCS:.cpp=.o) $(DSRCS:.cpp=.o)
 PCOBJS     = $(addsuffix p,  $(COBJS))
 DCOBJS     = $(addsuffix d,  $(COBJS))
 RCOBJS     = $(addsuffix r,  $(COBJS))
+HCOBJS     = $(addsuffix h,  $(COBJS))
+ECOBJS     = $(addsuffix e,  $(COBJS))
+CCOBJS     = $(addsuffix c,  $(COBJS))
 
 CXX       ?= clang++
-# CXX       ?= g++
 
 CFLAGS    ?= -Wall -Wno-deprecated-declarations -std=c++17
-LFLAGS    ?= -Wall -flto -fuse-ld=lld # remove lld option for g++
+LFLAGS    ?= -Wall -flto -fuse-ld=lld
 
 COPTIMIZE ?= -O3
 
-CFLAGS    += -I$(MROOT) -D __STDC_LIMIT_MACROS -D __STDC_FORMAT_MACROS
+CFLAGS    += -I$(MROOT)
 
-.PHONY : s d r rs clean
+.PHONY : s d r rs heuristic exact cutwidth clean
 
-s:	$(EXEC)
-d:	$(EXEC)_debug
-r:	$(EXEC)_release
-rs:	$(EXEC)_static
+## Executable names
+s:	       $(EXEC)
+d:	       $(EXEC)_debug
+r:	       $(EXEC)_release
+rs:	       $(EXEC)_static
+heuristic: $(EXEC)_heuristic
+exact:	   $(EXEC)_exact
+cutwidth:	 $(EXEC)_cutwidth
 
 ## Compile options
-%.o:			CFLAGS +=$(COPTIMIZE) -g -D DEBUG
-%.od:			CFLAGS +=-O0 -g -D DEBUG
-%.or:			CFLAGS +=$(COPTIMIZE) -g -D NDEBUG
+%.o:	CFLAGS +=$(COPTIMIZE) -g -D DEBUG
+%.od:	CFLAGS +=-O0 -g -D DEBUG
+%.or:	CFLAGS +=$(COPTIMIZE) -g -D NDEBUG
+%.oh:	CFLAGS +=$(COPTIMIZE) -g -D NDEBUG -D HEURISTIC
+%.oe:	CFLAGS +=$(COPTIMIZE) -g -D NDEBUG -D EXACT
+%.oc:	CFLAGS +=$(COPTIMIZE) -g -D NDEBUG -D CUTWIDTH
 
 ## Link options
-$(EXEC):		      LFLAGS += -g
-$(EXEC)_debug:		LFLAGS += -g
-$(EXEC)_release:	LFLAGS +=
-$(EXEC)_static:		LFLAGS += --static
+$(EXEC):		       LFLAGS += -g
+$(EXEC)_debug:		 LFLAGS += -g
+$(EXEC)_static:		 LFLAGS += --static
+$(EXEC)_release:	 LFLAGS +=
+$(EXEC)_heuristic: LFLAGS +=
+$(EXEC)_exact:	   LFLAGS +=
+$(EXEC)_cutwidth:	 LFLAGS +=
 
 ## Dependencies
-$(EXEC):		$(COBJS)
-$(EXEC)_debug:		$(DCOBJS)
-$(EXEC)_release:	$(RCOBJS)
-$(EXEC)_static:		$(RCOBJS)
+$(EXEC):		       $(COBJS)
+$(EXEC)_debug:		 $(DCOBJS)
+$(EXEC)_release:	 $(RCOBJS)
+$(EXEC)_static:		 $(RCOBJS)
+$(EXEC)_heuristic: $(HCOBJS)
+$(EXEC)_exact:     $(ECOBJS)
+$(EXEC)_cutwidth:  $(CCOBJS)
 
 ## Build rule
-%.o %.od %.or:	%.cpp
+%.o %.od %.or %.oh %.oe %.oc:	%.cpp
 	@echo Compiling: $(subst $(MROOT)/,,$@)
 	@$(CXX) $(CFLAGS) -c -o $@ $<
 
 ## Linking rules (standard/profile/debug/release)
-$(EXEC) $(EXEC)_debug $(EXEC)_release $(EXEC)_static:
+$(EXEC) $(EXEC)_debug $(EXEC)_release $(EXEC)_static $(EXEC)_heuristic $(EXEC)_exact $(EXEC)_cutwidth:
 	@echo Linking: "$@ ( $(foreach f,$^,$(subst $(MROOT)/,,$f)) )"
 	@$(CXX) $^ $(LFLAGS) -o $@
 
 ## Clean rule
 clean:
-	@rm -f $(EXEC) $(EXEC)_debug $(EXEC)_release $(EXEC)_static \
-	  $(COBJS) $(PCOBJS) $(DCOBJS) $(RCOBJS) log_* *.dimacs.gz depend.mk tmp.res
+	@rm -f $(EXEC) $(EXEC)_* $(COBJS) $(PCOBJS) $(DCOBJS) $(RCOBJS) $(HCOBJS) $(ECOBJS) $(CCOBJS) \
+	       log_* *.dimacs.gz depend.mk tmp.res
 
 ## Make dependencies
 depend.mk: $(CSRCS) $(CHDRS)
