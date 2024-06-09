@@ -31,7 +31,7 @@ void prepareCMDOptions(CMDOptions& options) {
 #elif defined(EXACT)
   options.AddAllowedOption("-graceful", "1", "Graceful exit");
   options.AddAllowedOption("-confidence", "30", "Minimum confidence to output a solution");
-  options.AddAllowedOption("-time-limit", "600", "Time limit in seconds; 0 means no limit");
+  options.AddAllowedOption("-time-limit", "300", "Time limit in seconds; 0 means no limit");
 #elif defined(CUTWIDTH)
   options.AddAllowedOption("-graceful", "1", "Graceful exit");
   options.AddAllowedOption("-confidence", "0", "Minimum confidence to output a solution");

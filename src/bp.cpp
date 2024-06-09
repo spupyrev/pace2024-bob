@@ -667,10 +667,6 @@ uint32_t BalancedPartitioning<T>::runIteration(
     Document* DocL = DocumentBegin[LeftGains[I].second];
     Document* DocR = DocumentBegin[RightGains[I].second];
 
-    // TODO: check the actual gains instead?
-    // if (UseStrongMoveGains && DocL->MoveGain <= 0 && DocR->MoveGain <= 0)
-    //   continue;
-
     // Try to swap the two documents
     const bool UseApproxGainL = (!Config.UseActualGains && AbsDiff(DocL->LastMovedIter, Iter) > 1 && Iter < 15);
     const int64_t DocLGain = UseApproxGainL ? LeftGains[I].first : DocL->MoveGain;
@@ -1150,8 +1146,7 @@ uint64_t BalancedPartitioning<T>::computeLowerBound(
     IntervalLB += Doc->getSelfCrossings();
   }
 
-  // TODO: This isn't guaranteed in certain cases
-  // Sanity check: count the actual number of crossings
+  // Sanity check: count the actual number of crossings (this isn't guaranteed in certain cases)
   // uint64_t ActualCrossings = 0;
   // for (uint32_t L = 0; L < N; L++) {
   //   for (uint32_t R = L + 1; R < N; R++) {
