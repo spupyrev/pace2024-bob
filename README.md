@@ -30,3 +30,5 @@ This creates an executable named `pace_*` and can be run as follows:
 
 > [!IMPORTANT]
 > Release **pace-2024** contains statically built binaries (for Linux) for the three tracks: `pace_heuristic`, `pace_exact`, and `pace_cutwidth`
+
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.11551133.svg)](https://doi.org/10.5281/zenodo.11551133)
