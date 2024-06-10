@@ -26,7 +26,7 @@ This creates an executable named `pace_*` and can be run as follows:
 | heuristic  | `./pace_heuristic < path/to/input_file.gr` |
 | exact      | `./pace_exact < path/to/input_file.gr` |
 | cutwidth   | `./pace_cutwidth < path/to/input_file.gr` |
-| dev (`make -j`)       | `./pace < path/to/input_file.gr` or `./pace -verbose=1 -help` for a list of supported options |
+| dev (`make -j`)       | `./pace < path/to/input_file.gr` or `./pace -verbose=1 -help` for supported options |
 
 > [!IMPORTANT]
 > Release **pace-2024** contains statically built binaries (for Linux) for the three tracks: `pace_heuristic`, `pace_exact`, and `pace_cutwidth`
