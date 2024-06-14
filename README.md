@@ -15,9 +15,9 @@ Use the corresponding versions of clang/lld for reproducible results.
 
 To build the executable, run one of the following commands at the root of the repository:
 ```
-make heuristic -j
-make exact -j
-make cutwidth -j
+make heuristic
+make exact
+make cutwidth
 ```
 This creates an executable named `pace_*` and can be run as follows:
 
@@ -26,9 +26,14 @@ This creates an executable named `pace_*` and can be run as follows:
 | heuristic  | `./pace_heuristic < path/to/input_file.gr` |
 | exact      | `./pace_exact < path/to/input_file.gr` |
 | cutwidth   | `./pace_cutwidth < path/to/input_file.gr` |
-| dev (`make -j`)       | `./pace < path/to/input_file.gr` or `./pace -verbose=1 -help` for supported options |
+| dev (`make`)       | `./pace < path/to/input_file.gr` or `./pace -verbose=1 -help` for supported options |
+| lite (`make lite`)       | `./pace_lite < path/to/input_file.gr` |
 
 > [!IMPORTANT]
 > Release **pace-2024** contains statically built binaries (for Linux) for the three tracks: `pace_heuristic`, `pace_exact`, and `pace_cutwidth`
+
+The lite version of the solver, `pace_lite` (not part of the competition), is able to process very large instances within seconds 
+at the cost of slightly worsened results. For example, *every* instance from the public dataset (containing up to 100K vertices) is processed 
+within 10 seconds producing less than extra 0.5% of crossings than the known optimum.
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.11551133.svg)](https://doi.org/10.5281/zenodo.11551133)
