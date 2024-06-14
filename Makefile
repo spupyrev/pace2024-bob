@@ -9,6 +9,8 @@
 ##    "make heuristic"
 ##    "make exact"
 ##    "make cutwidth"
+##
+##    "make lite" (a very fast version)
 
 EXEC      = pace
 DEPDIR    = src
@@ -28,6 +30,7 @@ RCOBJS     = $(addsuffix r,  $(COBJS))
 HCOBJS     = $(addsuffix h,  $(COBJS))
 ECOBJS     = $(addsuffix e,  $(COBJS))
 CCOBJS     = $(addsuffix c,  $(COBJS))
+LCOBJS     = $(addsuffix l,  $(COBJS))
 
 CXX       ?= clang++
 
@@ -38,7 +41,7 @@ COPTIMIZE ?= -O3
 
 CFLAGS    += -I$(MROOT)
 
-.PHONY : s d r rs heuristic exact cutwidth clean
+.PHONY : s d r rs heuristic exact cutwidth lite clean
 
 ## Executable names
 s:	       $(EXEC)
@@ -48,6 +51,7 @@ rs:	       $(EXEC)_static
 heuristic: $(EXEC)_heuristic
 exact:	   $(EXEC)_exact
 cutwidth:	 $(EXEC)_cutwidth
+lite:	     $(EXEC)_lite
 
 ## Compile options
 %.o:	CFLAGS +=$(COPTIMIZE) -g -D DEBUG
@@ -56,6 +60,7 @@ cutwidth:	 $(EXEC)_cutwidth
 %.oh:	CFLAGS +=$(COPTIMIZE) -g -D NDEBUG -D HEURISTIC
 %.oe:	CFLAGS +=$(COPTIMIZE) -g -D NDEBUG -D EXACT
 %.oc:	CFLAGS +=$(COPTIMIZE) -g -D NDEBUG -D CUTWIDTH
+%.ol:	CFLAGS +=$(COPTIMIZE) -g -D NDEBUG -D LITE
 
 ## Link options
 $(EXEC):		       LFLAGS += -g
@@ -65,6 +70,7 @@ $(EXEC)_release:	 LFLAGS +=
 $(EXEC)_heuristic: LFLAGS +=
 $(EXEC)_exact:	   LFLAGS +=
 $(EXEC)_cutwidth:	 LFLAGS +=
+$(EXEC)_lite:	     LFLAGS +=
 
 ## Dependencies
 $(EXEC):		       $(COBJS)
@@ -74,21 +80,22 @@ $(EXEC)_static:		 $(RCOBJS)
 $(EXEC)_heuristic: $(HCOBJS)
 $(EXEC)_exact:     $(ECOBJS)
 $(EXEC)_cutwidth:  $(CCOBJS)
+$(EXEC)_lite:  	   $(LCOBJS)
 
 ## Build rule
-%.o %.od %.or %.oh %.oe %.oc:	%.cpp
+%.o %.od %.or %.oh %.oe %.oc %.ol:	%.cpp
 	@echo Compiling: $(subst $(MROOT)/,,$@)
 	@$(CXX) $(CFLAGS) -c -o $@ $<
 
 ## Linking rules (standard/profile/debug/release)
-$(EXEC) $(EXEC)_debug $(EXEC)_release $(EXEC)_static $(EXEC)_heuristic $(EXEC)_exact $(EXEC)_cutwidth:
+$(EXEC) $(EXEC)_debug $(EXEC)_release $(EXEC)_static $(EXEC)_heuristic $(EXEC)_exact $(EXEC)_cutwidth $(EXEC)_lite:
 	@echo Linking: "$@ ( $(foreach f,$^,$(subst $(MROOT)/,,$f)) )"
 	@$(CXX) $^ $(LFLAGS) -o $@
 
 ## Clean rule
 clean:
-	@rm -f $(EXEC) $(EXEC)_* $(COBJS) $(PCOBJS) $(DCOBJS) $(RCOBJS) $(HCOBJS) $(ECOBJS) $(CCOBJS) \
-	       log_* *.dimacs.gz depend.mk tmp.res
+	@rm -f $(EXEC) $(EXEC)_* $(COBJS) $(PCOBJS) $(DCOBJS) $(RCOBJS) $(HCOBJS) $(ECOBJS) $(CCOBJS) $(LCOBJS) \
+	       log_* *.dimacs.gz depend.mk tmp*.res
 
 ## Make dependencies
 depend.mk: $(CSRCS) $(CHDRS)

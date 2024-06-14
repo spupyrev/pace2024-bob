@@ -23,6 +23,8 @@ void prepareCMDOptions(CMDOptions& options) {
 
   options.AddAllowedOption("-verbose", "0", "Output debug info");
   options.AddAllowedOption("-seed", "0", "Random seed");
+  options.AddAllowedOption("-i", "", "Input graph file name");
+  options.AddAllowedOption("-o", "", "Output graph file name");
 
 #if defined(HEURISTIC)
   options.AddAllowedOption("-graceful", "1", "Graceful exit");
@@ -78,8 +80,14 @@ void prepareCMDOptions(CMDOptions& options) {
   options.AddAllowedValue("-split-alg", "median");
   options.AddAllowedValue("-split-alg", "average");
 
-  options.AddAllowedOption("-i", "", "Input graph file name");
-  options.AddAllowedOption("-o", "", "Output graph file name");
+#if defined(LITE)
+  options.setOption("-bp-iters", "1");
+  options.setOption("-part-bp-iters", "0");
+  options.setOption("-max-docs-lb", "32");
+  options.setOption("-leaf-interval", "12");
+  options.setOption("-post-tune-all", "false");
+  options.setOption("-post-tune-int", "false");
+#endif
 }
 
 struct Result {
