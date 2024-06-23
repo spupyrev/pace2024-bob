@@ -1,9 +1,6 @@
 # Bob
 This repository contains the source code of a solver for the [PACE 2024](https://pacechallenge.org/2024/) challenge.
-
-## Description
-
-Coming
+See a [short description](docs/pace24bob.pdf) of the solver.
 
 ## Requirements
 Your machine needs to have a C++ compiler with C++17 support. We use GNU Make to build the executables.
