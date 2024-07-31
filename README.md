@@ -2,6 +2,8 @@
 This repository contains the source code of a solver for the [PACE 2024](https://pacechallenge.org/2024/) challenge.
 See a [short description](docs/pace24bob.pdf) of the solver.
 
+Bob came third&#129353;on the exact track, second&#129352;on the heuristic track, and got the maximum score on the parameterized track.
+    
 ## Requirements
 Your machine needs to have a C++ compiler with C++17 support. We use GNU Make to build the executables.
 
